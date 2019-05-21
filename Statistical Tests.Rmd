@@ -1,0 +1,463 @@
+---
+title: "Statistical tests in R"
+author: "Cyrus Muriithi"
+date: "10/02/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+rm(list = ls())
+
+path <- paste("/Volumes/DOCUMENTS/Busara/Project/Lab Reading Group/")
+
+knitr::opts_knit$set(root.dir = normalizePath(path))
+
+pkgs <- c("dplyr","ggplot2","ggthemes","lubridate","kableExtra","readstata13","stringi","data.table")
+
+miss_pkgs <- pkgs[!pkgs %in% installed.packages()[,1]] # vector of missing packages
+if(length(miss_pkgs)>0){
+  install.packages(miss_pkgs)
+}
+invisible(lapply(pkgs,library,character.only=TRUE))
+```
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+mydata <- read.csv(file = "./raw_data/HRDataset_v9.csv")
+
+mydata<- mydata%>%
+  mutate(Hispanic.Latino = factor(if_else(Hispanic.Latino=="no","No",if_else(Hispanic.Latino=="yes","Yes",as.character(Hispanic.Latino)))))
+```
+
+### 1. One Sample t-Test
+Why is it used?
+
+It is a parametric test used to test if the mean of a sample from a normal distribution could reasonably be a specific value.
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+t.test(mydata$Pay.Rate, mu=35) # testing if mean of x could be
+```
+
+How to interpret?
+
+In above case, the p-Value is not less than significance level of 0.05, therefore the null hypothesis that the mean=31.28481 cannot be rejected. Also note that the 95% confidence interval range includes the value 31.28481 within its range. So, it is ok to say the mean of ‘x’ is 31.28481, especially since ‘x’ is assumed to be normally distributed. In case, a normal distribution is not assumed, use wilcoxon signed rank test shown in next section.
+
+Note: Use conf.level argument to adjust the confidence level.
+
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+
+```
+
+### 2. Wilcoxon Signed Rank Test
+Why / When is it used?
+
+To test the mean of a sample when normal distribution is not assumed. Wilcoxon signed rank test can be an alternative to t-Test, especially when the data sample is not assumed to follow a normal distribution. It is a non-parametric method used to test if an estimate is different from its true value.
+
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+wilcox.test(mydata$Pay.Rate, mu=35, conf.int = TRUE)
+```
+
+How to interpret?
+
+If p-Value < 0.05, reject the null hypothesis and accept the alternate mentioned in your R code’s output. Type example(wilcox.test) in R console for more illustration.
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+
+```
+
+### 3. Two Sample t-Test and Wilcoxon Rank Sum Test
+
+Both t.Test and Wilcoxon rank test can be used to compare the mean of 2 samples. The difference is t-Test assumes the samples being tests is drawn from a normal distribution, while, Wilcoxon’s rank sum test does not.
+How to implement in R?
+
+Pass the two numeric vector samples into the t.test() when sample is distributed ‘normal’y and wilcox.test() when it isn’t assumed to follow a normal distribution.
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+wilcox.test(mydata$Pay.Rate, mydata$Age, alternative = "g")  # g for greater
+```
+
+With a p-Value of 1, we cannot reject the null hypothesis that both Pay.Rate & Age  have same means.
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+
+```
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+t.test(mydata$Pay.Rate, mydata$Age)      # P = 2.822e-13
+
+boxplot(cbind(mydata$Pay.Rate, mydata$Age))
+```
+With p-Value < 0.05, we can safely reject the null hypothesis that there is no difference in mean.
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+scatter.smooth(mydata$Pay.Rate, mydata$Age, main="Payrate ~ Age")  # scatterplot
+
+```
+
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+
+par(mfrow=c(1, 2))  # divide graph area in 2 columns
+
+boxplot(mydata$Pay.Rate, main="Payrate", sub=paste("Outlier rows: ", boxplot.stats(mydata$Pay.Rate)$out))  # box plot for 'Payrate'
+
+boxplot(mydata$Age, main="Age", sub=paste("Outlier rows: ", boxplot.stats(mydata$Age)$out))  # box plot for 'Age'
+```
+
+Using Density Plot To Check If Response Variable Is Close To Normal
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+library(e1071)  # for skewness function
+par(mfrow=c(1, 2))  # divide graph area in 2 columns
+
+plot(density(mydata$Pay.Rate), main="Density Plot: Payrate", 
+     ylab="Frequency", 
+     sub=paste("Skewness:", round(e1071::skewness(mydata$Pay.Rate, 2))))  # density plot for 'Payrate'
+
+polygon(density(mydata$Pay.Rate), col="red")
+
+plot(density(mydata$Age), main="Density Plot: Age", ylab="Frequency", sub=paste("Skewness:", round(e1071::skewness(mydata$Age), 2)))  # density plot for 'Age'
+
+polygon(density(mydata$Age), col="red")
+```
+
+
+What if we want to do a 1-to-1 comparison of means for values of Age and Payrate?
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+# Use paired = TRUE for 1-to-1 comparison of observations.
+t.test(mydata$Pay.Rate, mydata$Age, paired = TRUE) # when observations are paired, use 'paired' argument.
+wilcox.test(mydata$Pay.Rate, mydata$Age, paired = TRUE) # both x and y are assumed to have similar shapes
+```
+
+
+When can I conclude if the mean’s are different?
+
+Conventionally, If the p-Value is less than significance level (ideally 0.05), reject the null hypothesis that both means are the are equal.
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+
+```
+
+### 4. Shapiro Test
+Why is it used?
+
+To test if a sample follows a normal distribution.
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+shapiro.test(mydata$Pay.Rate) # Does myVec follow a normal disbn?
+```
+
+How to interpret?
+
+The null hypothesis here is that the sample being tested is normally distributed. Since the p Value is  less that the significane level of 0.05, we  reject the null hypothesis. Therefore, the tested sample is confirmed not to follow a normal distribution
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+# Example: Test a normal distribution
+set.seed(100)
+normaly_disb <- rnorm(100, mean=5, sd=1) # generate a normal distribution
+shapiro.test(normaly_disb)  # the shapiro test.
+```
+How to interpret?
+
+The null hypothesis here is that the sample being tested is normally distributed. Since the p Value is not less that the significane level of 0.05, we don’t reject the null hypothesis. Therefore, the tested sample is confirmed to follow a normal distribution (thou, we already know that!).
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+
+```
+
+### 5. Kolmogorov And Smirnov Test
+
+Kolmogorov-Smirnov test is used to check whether 2 samples follow the same distribution.
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+ks.test(mydata$Pay.Rate, mydata$Age) # x and y are two numeric vector
+```
+
+How to tell if they are from the same distribution ?
+
+If p-Value < 0.05 (significance level), we reject the null hypothesis that they are drawn from same distribution. In other words, p < 0.05 implies x and y from different distributions
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+
+```
+
+###6. Fisher’s F-Test
+
+Fisher’s F test can be used to check if two samples have same variance.
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+var.test(mydata$Pay.Rate, mydata$Age)  # Do x and y have the same variance?
+```
+
+Alternatively fligner.test() and bartlett.test() can be used for the same purpose.
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+
+```
+
+
+### 7. Chi Squared Test
+
+Chi-squared test in R can be used to test if two categorical variables are dependent, by means of a contingency table.
+
+Example use case: You may want to figure out if big budget films become box-office hits. We got 2 categorical variables (Budget of film, Success Status) each with 2 factors (Big/Low budget and Hit/Flop), which forms a 2 x 2 matrix.
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+chisq.test(table(mydata$Sex, mydata$Hispanic.Latino), correct = FALSE)  # Yates continuity correction not applied
+#or
+summary(table(mydata$Sex, mydata$Hispanic.Latino)) # performs a chi-squared test.
+```
+How to tell if x, y are independent?
+
+There are two ways to tell if they are independent:
+
+1.) By looking at the p-Value: If the p-Value is less that 0.05, we fail to reject the null hypothesis that the x and y are independent. So for the example output above, (p-Value=2.954e-07), we reject the null hypothesis and conclude that x and y are not independent.
+
+2.) From Chi.sq value: For 2 x 2 contingency tables with 2 degrees of freedom (d.o.f), if the Chi-Squared calculated is greater than 3.841 (critical value), we reject the null hypothesis that the variables are independent. To find the critical value of larger d.o.f contingency tables, use qchisq(0.95, n-1), where n is the number of variables.
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+
+```
+
+### 8. Correlation
+Why is it used?
+
+To test the linear relationship of two continuous variables
+
+The cor.test() function computes the correlation between two continuous variables and test if the y is dependent on the x. The null hypothesis is that the true correlation between x and y is zero.
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+cor.test(mydata$Pay.Rate, mydata$Age)
+```
+
+How to interpret?
+
+If the p Value is less than 0.05, we reject the null hypothesis that the true correlation is zero (i.e. they are independent). So in this case, we reject the null hypothesis and conclude that dist is dependent on speed.
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+
+```
+
+
+#9. More Commonly Used Tests
+
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE, eval=FALSE}
+fisher.test(contingencyMatrix, alternative = "greater")  # Fisher's exact test to test independence of rows and columns in contingency table
+friedman.test()  # Friedman's rank sum non-parametric test 
+```
+
+
+There are more useful tests available in various other packages.
+
+The package lawstat has a good collection. The outliers package has a number of test for testing for presence of outliers.
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+
+```
+
+### Effect size statistics
+
+One way to account for the effect of sample size on our statistical tests is to consider effect size statistics.  These statistics reflect the size of the effect in a standardized way, and are unaffected by sample size.
+
+ 
+
+An appropriate effect size statistic for a t-test is Cohen’s d.  It takes the difference in means between the two groups and divides by the pooled standard deviation of the groups.  Cohen’s d equals zero if the means are the same, and increases to infinity as the difference in means increases relative to the standard deviation.
+
+ 
+
+In the following, note that Cohen’s d is not affected by the sample size difference in the Class.C / Class.D and the Class.E /  Class.F examples.
+
+Effect size statistics are standardized so that they are not affected by the units of measurements of the data.  This makes them interpretable across different situations.  Cohen’s d of 1 suggests that the two means differ by one pooled standard deviation. A Cohen’s d of 0.5 suggests that the two means differ by one-half the pooled standard deviation.
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+library(lsr)
+
+cohensD(mydata$Pay.Rate, mydata$Age,
+        method = "raw")
+```
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+
+```
+5. Building the Linear Regression Model
+
+Now that you have seen the linear relationship pictorially in the scatter plot and through correlation, let’s try building the linear regression model.
+
+The function used for building linear models is lm().
+
+The lm() function takes in two main arguments:
+
+    Formula
+    Data
+
+The data is typically a data.frame object and the formula is a object of class formula.
+
+But the most common convention is to write out the formula directly as written below.
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+linearMod <- lm(Pay.Rate ~ Age, data=mydata)  # build linear regression model on full data
+summary(linearMod)
+```
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+
+```
+
+The one-way analysis of variance (ANOVA), also known as one-factor ANOVA, is an extension of independent two-samples t-test for comparing means in a situation where there are more than two groups. In one-way ANOVA, the data is organized into several groups base on one single grouping variable (also called factor variable). This tutorial describes the basic principle of the one-way ANOVA test and provides practical anova test examples in R software. 
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+library(ggpubr)
+ggboxplot(mydata, x = "MaritalDesc", y = "Pay.Rate", 
+          color = "CitizenDesc", palette = c("#00AFBB", "#E7B800", "#FC4E07","#d5e1e7","#4495d8","#ff333a"),
+          #order = c("ctrl", "trt1", "trt2"),
+          ylab = "Payrate", xlab = "Citizen")
+```
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+ggline(mydata, x = "MaritalDesc", y = "Pay.Rate", 
+       add = c("mean_se", "jitter"), 
+       #order = c("ctrl", "trt1", "trt2"),
+       ylab = "Payrate", xlab = "Citizen")
+
+```
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+# Box plot
+boxplot(Pay.Rate ~ MaritalDesc, data = mydata,
+        xlab = "Citizen", ylab = "Payrate",
+        frame = FALSE, col = c("#00AFBB", "#E7B800", "#FC4E07","#d5e1e7","#4495d8","#ff333a"))
+# plotmeans
+library("gplots")
+plotmeans(Pay.Rate ~ MaritalDesc, data = mydata, frame = FALSE,
+          xlab = "Citizen", ylab = "Payrate",
+          main="Mean Plot with 95% CI") 
+```
+
+### Compute one-way ANOVA test
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+# Compute the analysis of variance
+res.aov <- aov(Pay.Rate ~ MaritalDesc, data = mydata)
+# Summary of the analysis
+summary(res.aov)
+```
+
+
+Interpret the result of one-way ANOVA tests
+
+As the p-value is less than the significance level 0.05, we can conclude that there are significant differences between the groups highlighted with “*" in the model summary.
+
+
+Multiple pairwise-comparison between the means of groups
+
+In one-way ANOVA test, a significant p-value indicates that some of the group means are different, but we don’t know which pairs of groups are different.
+
+It’s possible to perform multiple pairwise-comparison, to determine if the mean difference between specific pairs of group are statistically significant.
+Tukey multiple pairwise-comparisons
+
+As the ANOVA test is significant, we can compute Tukey HSD (Tukey Honest Significant Differences, R function: TukeyHSD()) for performing multiple pairwise-comparison between the means of groups.
+
+The function TukeyHD() takes the fitted ANOVA as an argument.
+
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+TukeyHSD(res.aov)
+```
+
+
+diff: difference between means of the two groups
+lwr, upr: the lower and the upper end point of the confidence interval at 95% (default)
+p adj: p-value after adjustment for the multiple comparisons.
+
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+
+```
+
+Check ANOVA assumptions: test validity?
+
+The ANOVA test assumes that, the data are normally distributed and the variance across groups are homogeneous. We can check that with some diagnostic plots.
+Check the homogeneity of variance assumption
+
+The residuals versus fits plot can be used to check the homogeneity of variances.
+
+In the plot below, there is no evident relationships between residuals and fitted values (the mean of each groups), which is good. So, we can assume the homogeneity of variances.e simplified format is as follow:
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+# 1. Homogeneity of variances
+plot(res.aov, 1)
+```
+
+It’s also possible to use Bartlett’s test or Levene’s test to check the homogeneity of variances.
+We recommend Levene’s test, which is less sensitive to departures from normal distribution. The function leveneTest() [in car package] will be used:
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+library(car)
+leveneTest(Pay.Rate ~ MaritalDesc, data = mydata)
+```
+
+
+From the output above we can see that the p-value is not less than the significance level of 0.05. This means that there is no evidence to suggest that the variance across groups is statistically significantly different. Therefore, we can assume the homogeneity of variances in the different treatment groups.
+
+Relaxing the homogeneity of variance assumption
+
+The classical one-way ANOVA test requires an assumption of equal variances for all groups. In our example, the homogeneity of variance assumption turned out to be fine: the Levene test is not significant.
+
+How do we save our ANOVA test, in a situation where the homogeneity of variance assumption is violated?
+
+An alternative procedure (i.e.: Welch one-way test), that does not require that assumption have been implemented in the function oneway.test().
+
+
+
+### ANOVA test with no assumption of equal variances
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+oneway.test(Pay.Rate ~ MaritalDesc, data = mydata)
+```
+
+
+####Pairwise t-tests with no assumption of equal variances
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+
+pairwise.t.test(mydata$Pay.Rate, mydata$MaritalDesc,
+                 p.adjust.method = "BH", pool.sd = FALSE)
+```
+
+
+Check the normality assumption
+
+Normality plot of residuals. In the plot below, the quantiles of the residuals are plotted against the quantiles of the normal distribution. A 45-degree reference line is also plotted.
+
+The normal probability plot of residuals is used to check the assumption that the residuals are normally distributed. It should approximately follow a straight line.
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+# 2. Normality
+plot(res.aov, 2)
+```
+
+
+As all the points fall approximately along this reference line, we can assume normality.
+
+The conclusion above, is supported by the Shapiro-Wilk test on the ANOVA residuals (W = 0.96, p = 0.6) which finds no indication that normality is violated.
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+# Extract the residuals
+aov_residuals <- residuals(object = res.aov )
+# Run Shapiro-Wilk test
+shapiro.test(x = aov_residuals )
+```
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+
+```
+
+Non-parametric alternative to one-way ANOVA test
+
+Note that, a non-parametric alternative to one-way ANOVA is Kruskal-Wallis rank sum test, which can be used when ANNOVA assumptions are not met.
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+kruskal.test(Pay.Rate ~ MaritalDesc, data = mydata)
+```
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+
+```
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+
+```
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+
+```
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+
+```
