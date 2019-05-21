@@ -1,0 +1,343 @@
+---
+title: "Internal Engagement - Cyrus Herder"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    theme: flatly
+    source_code: embed
+    social: ["linkedin","twitter","facebook"]
+---
+
+```{r setup, include=FALSE}
+rm(list = ls())
+
+path <- paste("/Volumes/DOCUMENTS/Personal/Advancement/")
+
+knitr::opts_knit$set(root.dir = normalizePath(path))
+
+pkgs <- c("dplyr","ggplot2","ggthemes","lubridate","kableExtra","flexdashboard","stringi","data.table",
+          "tabulizer","readxl","xlsx","tidyr","treemap","forecast","viridisLite","AER","scales","highcharter","dygraphs")
+
+miss_pkgs <- pkgs[!pkgs %in% installed.packages()[,1]] # vector of missing packages
+if(length(miss_pkgs)>0){
+  install.packages(miss_pkgs)
+}
+invisible(lapply(pkgs,library,character.only=TRUE))
+
+pal <- scale_fill_manual(values = c("#b2d234","#038ecd","#00377c","#a53b47","#4d4d4f",
+                                    "#7798BF", "#AAEEEE"))
+
+
+theme_hc <- function(){
+  theme(
+    text                = element_text(family="Source Sans Pro", size = 12),
+    plot.title = element_text(family="Source Sans Pro Semibold", size = rel(1.4), 
+                              hjust = 0.5),
+    axis.line.x = element_line(colour = "black", size=0.5),
+    axis.text.x = element_text(family = "Source Sans Pro", size = rel(1.0)),
+    axis.text.y = element_text(family = "Source Sans Pro", size = rel(1.2)),
+    axis.title = element_text(family = "Source Sans Pro", size = rel(1.0)),
+    #title               = element_text(hjust=0), 
+    axis.title.x        = element_text(hjust=.5),
+    axis.title.y        = element_text(hjust=.5),
+    panel.grid.major.y  = element_line(color='gray', size = .3),
+    panel.grid.minor.y  = element_blank(),
+    panel.grid.major.x  = element_blank(),
+    panel.grid.minor.x  = element_blank(),
+    panel.border        = element_blank(),
+    panel.background    = element_blank(),
+    legend.position     = "bottom",
+    legend.title        = element_blank(),
+    legend.direction = "horizontal"
+  )
+}
+
+thm <- 
+  hc_theme(
+    colors = c("#b2d234","#038ecd","#00377c"),
+    chart = list(
+      backgroundColor = "transparent",
+      style = list(fontFamily = "Source Sans Pro")
+    ),
+    xAxis = list(
+      gridLineWidth = 1
+    )
+  )
+```
+
+
+Introduction {data-icon="fa-info-circle"}
+===================================== 
+
+How to Set up a knitted Rmarkdown in form of Flexdashboard
+
+### Lung Deaths (All)
+
+```{r}
+dygraph(ldeaths)
+```
+
+### Lung Deaths (Male)
+
+```{r}
+dygraph(mdeaths)
+```
+
+### Lung Deaths (Female)
+
+```{r}
+dygraph(fdeaths)
+```
+
+
+
+Analysis {data-icon="fal fa-wifi"}
+=====================================  
+
+**Does the use of a contextually appropriate instrument affect that likelihood that Kibera residents rank as more likely a less probable but more 'representative' option in the 'Linda' problem?**
+
+
+
+Column {data-width=600}
+-----------------------------------------------------------------------
+
+### Sales Forecast
+
+```{r}
+AirPassengers %>% 
+  forecast(level = 90) %>% 
+  hchart() %>% 
+  hc_add_theme(thm)
+```
+
+
+### Sales by State
+
+```{r}
+data("USArrests", package = "datasets")
+data("usgeojson")
+
+USArrests <- USArrests %>%
+  mutate(state = rownames(.))
+
+n <- 4
+colstops <- data.frame(
+  q = 0:n/n,
+  c = substring(viridis(n + 1), 0, 7)) %>%
+  list_parse2()
+
+highchart() %>%
+  hc_add_series_map(usgeojson, USArrests, name = "Sales",
+                    value = "Murder", joinBy = c("woename", "state"),
+                    dataLabels = list(enabled = TRUE,
+                                      format = '{point.properties.postalcode}')) %>%
+  hc_colorAxis(stops = colstops) %>%
+  hc_legend(valueDecimals = 0, valueSuffix = "%") %>%
+  hc_mapNavigation(enabled = TRUE) %>%
+  hc_add_theme(thm)
+```
+
+Column {.tabset data-width=400}
+-----------------------------------------------------------------------
+
+### Sales by Category
+
+```{r, fig.keep='none'}
+data("Groceries", package = "arules")
+dfitems <- tbl_df(Groceries@itemInfo)
+
+set.seed(10)
+
+dfitemsg <- dfitems %>%
+  mutate(category = gsub(" ", "-", level1),
+         subcategory = gsub(" ", "-", level2)) %>%
+  group_by(category, subcategory) %>% 
+  summarise(sales = n() ^ 3 ) %>% 
+  ungroup() %>% 
+  sample_n(31)
+
+tm <- treemap(dfitemsg, index = c("category", "subcategory"),
+              vSize = "sales", vColor = "sales",
+              type = "value", palette = rev(viridis(6)))
+
+highchart() %>% 
+  hc_add_series_treemap(tm, allowDrillToNode = TRUE,
+                        layoutAlgorithm = "squarified") %>% 
+  hc_add_theme(thm)
+```
+
+### Best Sellers
+
+```{r}
+set.seed(2)
+
+nprods <- 10
+
+dfitems %>% 
+  sample_n(nprods) %>% 
+  .$labels %>% 
+  rep(times = sort(sample( 1e4:2e4, size = nprods), decreasing = TRUE)) %>% 
+  factor(levels = unique(.)) %>% 
+  hchart(showInLegend = FALSE, name = "Sales", pointWidth = 10) %>% 
+  hc_add_theme(thm) %>% 
+  hc_chart(type = "bar")
+  
+```
+
+
+Overall Cases {data-navmenu="Special Cases" data-icon="fa-check"}
+=====================================
+
+**Distribution of Average Cases overall**
+
+Row 
+-------------------------------------
+   
+### Group Means - Overall
+```{r}
+RC<- USArrests%>%
+  tidyr::gather(Types, Values,-state)%>%
+  group_by(Types)%>%
+  summarise(Mean_val = mean(Values))%>%
+  ggplot(aes(x= reorder(Types,Mean_val), y= Mean_val))+
+  geom_bar(stat = "identity", fill = "#038ecd")+
+  geom_text(aes(label=Mean_val),vjust = -0.25, 
+            size = 4, position = position_dodge(0.9),family="Source Sans Pro Semibold")+
+  labs(y="Average",x="Type",title="Averages Cases Reported")+
+  theme_hc()+pal
+RC  
+```
+
+
+Cases by State {data-navmenu="Special Cases" data-icon="fa-check"}
+=====================================
+
+**Distribution of Average Cases overall**
+
+Column {.tabset data-width=400}
+-------------------------------------
+
+
+### Murder >10
+
+```{r}
+
+ggplot(USArrests%>%filter(Murder>10),aes(x= reorder(state,Murder), y= Murder))+
+  geom_bar(stat = "identity", fill = "#038ecd")+
+  geom_text(aes(label=Murder),vjust = -0.25, 
+            size = 4, position = position_dodge(0.9),family="Source Sans Pro Semibold")+
+  labs(y="Average",x="",title="Averages Murder Cases Reported")+
+  theme_hc()+ coord_flip()
+```
+
+
+Column
+-------------------------------------
+
+### Assault > 220
+
+```{r}
+
+ggplot(USArrests%>%filter(Assault>220),aes(x= reorder(state,Assault), y= Assault))+
+  geom_bar(stat = "identity", fill = "#038ecd")+
+  geom_text(aes(label=Assault),vjust = -0.25, 
+            size = 3, position = position_dodge(0.9),family="Source Sans Pro Semibold")+
+  labs(y="Average",x="",title="Averages Assault Cases Reported")+
+  theme_hc()+ coord_flip()
+```
+
+### UrbanPop >75
+
+```{r}
+
+ggplot(USArrests%>%filter(UrbanPop>75),aes(x= reorder(state,UrbanPop), y= UrbanPop))+
+  geom_bar(stat = "identity", fill = "#038ecd")+
+  geom_text(aes(label=UrbanPop),vjust = -0.25, 
+            size = 4, position = position_dodge(0.9),family="Source Sans Pro Semibold")+
+  labs(y="Average",x="",title="Averages Urban Population Cases Reported")+
+  theme_hc()+ coord_flip()
+```
+
+Values {data-icon="far fa-star-half-alt"}
+===================================== 
+
+
+Row
+-------------------------------------
+
+
+### Articles per Day
+
+```{r}
+computeArticles = function(...) return(45)
+computeComments = function(...) return(126)
+computeSpam = function(...) return(15)
+
+articles <- computeArticles()
+valueBox(articles, icon = "fa-pencil")
+```
+
+### Comments per Day
+
+```{r}
+comments <- computeComments()
+valueBox(comments, icon = "fa-comments")
+```
+
+
+
+### Spam per Day
+
+```{r}
+spam <- computeSpam()
+valueBox(spam, 
+         icon = "fa-trash",
+         color = ifelse(spam > 10, "warning", "primary"))
+```
+
+Row
+-------------------------------------
+
+
+### Linked Value Box
+
+```{r}
+valueBox(42, icon = "fa-pencil", href="#details")
+```
+
+
+Rating {data-icon="fas fa-door-open"}
+===================================== 
+
+
+Row {data-width=4}
+-----------------------------------------------------------------------
+
+### Contact Rate
+
+```{r}
+gauge(91, min = 0, max = 100, symbol = '%', gaugeSectors(
+  success = c(80, 100), warning = c(40, 79), danger = c(0, 39)
+))
+```
+
+### Average Rating 
+
+```{r}
+gauge(37.4, min = 0, max = 50, gaugeSectors(
+  success = c(41, 50), warning = c(21, 40), danger = c(0, 20)
+))
+```
+
+Row {data-width=4}
+-----------------------------------------------------------------------
+
+### Cancellations
+
+```{r}
+gauge(7, min = 0, max = 10, gaugeSectors(
+  success = c(0, 2), warning = c(3, 6), danger = c(7, 10)
+))
+```
+
+
